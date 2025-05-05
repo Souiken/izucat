@@ -4,4 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-walkdir = "2"
+ignore = "0.4"
+indicatif = "0.17"

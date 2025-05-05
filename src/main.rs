@@ -1,8 +1,8 @@
+use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
-use walkdir::WalkDir;
 
 /// binary?
 fn is_binary(path: &Path) -> bool {
@@ -14,14 +14,12 @@ fn is_binary(path: &Path) -> bool {
                 return true;
             }
 
-            let text_characters: Vec<u8> = (0x20..=0xFF)
-            .chain([7, 8, 9, 10, 12, 13, 27])
-            .collect();
+            let text_characters: Vec<u8> = (0x20..=0xFF).chain([7, 8, 9, 10, 12, 13, 27]).collect();
             let nontext: Vec<u8> = chunk
-            .iter()
-            .filter(|b| !text_characters.contains(b))
-            .copied()
-            .collect();
+                .iter()
+                .filter(|b| !text_characters.contains(b))
+                .copied()
+                .collect();
             return !nontext.is_empty();
         }
     }
@@ -30,19 +28,7 @@ fn is_binary(path: &Path) -> bool {
 
 /// escape
 fn escape_typst(text: &str) -> String {
-    text.replace('`', "\\`")
-    // .replace('\\', "\\\\")
-    // .replace('#', "\\#")
-    // .replace('`', "\\`")
-    // .replace('[', "\\[")
-    // .replace(']', "\\]")
-    // .replace('*', "\\*")
-    // .replace('$', "\\$")
-    // .replace('<', "\\<")
-    // .replace('_', "\\_")
-    // .replace('@', "\\@")
-
-    // text.to_string()
+    text.replace('`', "`\u{200B}")
 }
 
 /// bin to hex
@@ -54,27 +40,33 @@ fn to_hex_view(data: &[u8]) -> String {
         let offset = i * 16;
         let hex_bytes: Vec<String> = chunk.iter().map(|b| format!("{:02X}", b)).collect();
         let ascii_bytes: String = chunk
-        .iter()
-        .map(|&b| if (32..=126).contains(&b) { b as char } else { '.' })
-        .collect();
+            .iter()
+            .map(|&b| {
+                if (32..=126).contains(&b) {
+                    b as char
+                } else {
+                    '.'
+                }
+            })
+            .collect();
         lines.push(format!(
             "{:08X}  {:<47}  {}",
             offset,
             hex_bytes.join(" "),
-                           ascii_bytes
+            ascii_bytes
         ));
     }
 
     lines.join("\n")
 }
 
-/// generate typst from path
-fn generate_typst_from_dir(input_dir: &str, output_file: &str) -> io::Result<()> {
-    let mut entries: Vec<_> = WalkDir::new(input_dir)
-    .into_iter()
-    .filter_map(|e| e.ok())
-    .filter(|e| e.path().is_file())
-    .collect();
+/// generate typst
+fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
+    let mut entries: Vec<_> = ignore::WalkBuilder::new(input_dir)
+        .build()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .collect();
 
     entries.sort_by_key(|e| e.file_name().to_os_string());
 
@@ -84,10 +76,21 @@ fn generate_typst_from_dir(input_dir: &str, output_file: &str) -> io::Result<()>
     writeln!(out, "#show raw: set text(font: \"Unifont\", size: 8pt)")?;
     writeln!(out, "#show raw: set par(leading: 0.46em)\n")?;
 
+    let bar = ProgressBar::new(entries.len() as u64);
+    bar.set_style(
+        ProgressStyle::default_bar()
+            .template("  Building [{bar:25.cyan/blue}] {pos}/{len}: {msg}")
+            .unwrap()
+            .progress_chars("=> "),
+    );
+
     for (i, entry) in entries.iter().enumerate() {
+        bar.set_message(entry.path().display().to_string());
         let path = entry.path();
         let rel_path = path.strip_prefix(input_dir).unwrap_or(path);
         let mut display_name = rel_path.display().to_string().replace("\\", "/");
+
+        writeln!(out, "```text")?;
 
         if is_binary(path) {
             display_name += " (binary)";
@@ -96,44 +99,63 @@ fn generate_typst_from_dir(input_dir: &str, output_file: &str) -> io::Result<()>
             let hex_view = to_hex_view(&data);
             let escaped = escape_typst(&hex_view);
 
-            writeln!(out, "```text")?;
             writeln!(out, "{}\n----------------", display_name)?;
             writeln!(out, "{}", escaped)?;
-            writeln!(out, "```\n")?;
         } else {
             let mut content = String::new();
             File::open(path)?.read_to_string(&mut content)?;
             let escaped = escape_typst(&content);
 
-            writeln!(out, "```text")?;
             writeln!(out, "{}\n----------------", display_name)?;
             writeln!(out, "{}", escaped)?;
-            writeln!(out, "```\n")?;
         }
+
+        writeln!(out, "```\n")?;
 
         if i < entries.len() - 1 {
-            writeln!(out, "#pagebreak()\n")?;
+            writeln!(out, "#pagebreak()")?;
         }
+        bar.inc(1);
     }
+    bar.finish_with_message("Done!");
 
-    println!("Generate OK: {}", output_file);
-    println!("Use typst c {} output.pdf", output_file);
+    println!("Generated: {}", output_file);
+    println!("To compile PDF: typst c {} output.pdf", output_file);
     Ok(())
 }
 
 /// program entrance
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 4 || args[2] != "-o" {
-        eprintln!("Usage: izucat <path> -o <output>");
-        std::process::exit(1);
+fn main() -> std::io::Result<()> {
+    let _args = env::args().skip(1);
+    let mut input_path = None;
+    let mut output_file = None;
+
+    // help 
+    let args_vec: Vec<String> = env::args().skip(1).collect();
+    if args_vec.is_empty() || args_vec.iter().any(|a| a == "-h" || a == "--help") {
+        println!("
+        Usage: izucat [OPTIONS] <INPUT_DIR>\nOptions:\n    -o <FILE>        Output Typst file name (default: output.typ)\n    -h, --help       Show this help message
+        ");
+        return Ok(());
     }
 
-    let input_dir = &args[1];
-    let output_file = &args[3];
+    let mut args = args_vec.into_iter();
 
-    if let Err(e) = generate_typst_from_dir(input_dir, output_file) {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "-o" => {
+                output_file = args.next();
+            }
+            _ => {
+                input_path = Some(arg);
+            }
+        }
     }
+
+    let input_path = input_path.unwrap_or_else(|| ".".to_string());
+    let output_file = output_file.unwrap_or_else(|| "output.typ".to_string());
+
+    generate_typst(&input_path, &output_file)?;
+
+    Ok(())
 }
