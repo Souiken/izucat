@@ -9,13 +9,16 @@ cargo build --release
 ```
 
 ## Usage
-```bash
-izucat <path> -o <output.typ>
+```
+Usage: izucat [OPTIONS] <INPUT_DIR>
+Options:
+    -o <FILE>        Output Typst file name (default: output.typ)
+    -h, --help       Show this help message
 ```
 
 Example:
 ```
-izucat ./project -o output.typ
+izucat -o output.typ ./project 
 typst c output.typ output.pdf
 ```
 
@@ -24,7 +27,8 @@ Text:
 ```text
 path/to/file
 ----------------
-Everyone has the right to an effective remedy by the competent national tribunals for acts violating the fundamental rights granted him by the constitution or by law. 
+Everyone has the right to an effective remedy by the competent national tribunals
+for acts violating the fundamental rights granted him by the constitution or by law. 
 ```
 
 HEX:
