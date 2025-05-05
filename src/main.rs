@@ -133,8 +133,7 @@ fn main() -> std::io::Result<()> {
     // help 
     let args_vec: Vec<String> = env::args().skip(1).collect();
     if args_vec.is_empty() || args_vec.iter().any(|a| a == "-h" || a == "--help") {
-        println!("
-        Usage: izucat [OPTIONS] <INPUT_DIR>\nOptions:\n    -o <FILE>        Output Typst file name (default: output.typ)\n    -h, --help       Show this help message
+        println!("Usage: izucat [OPTIONS] <INPUT_DIR>\nOptions:\n    -o <FILE>        Output Typst file name (default: output.typ)\n    -h, --help       Show this help message
         ");
         return Ok(());
     }
