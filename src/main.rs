@@ -3,6 +3,7 @@ use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
+use std::time::Instant;
 
 /// binary?
 fn is_binary(path: &Path) -> bool {
@@ -62,13 +63,18 @@ fn to_hex_view(data: &[u8]) -> String {
 
 /// generate typst
 fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
+    let start_time = Instant::now();
     let mut entries: Vec<_> = ignore::WalkBuilder::new(input_dir)
         .build()
         .filter_map(|e| e.ok())
         .filter(|e| e.path().is_file())
         .collect();
 
+    let total = entries.len();
     entries.sort_by_key(|e| e.file_name().to_os_string());
+
+    println!("\r      izucat v{}", env!("CARGO_PKG_VERSION"));
+    println!("\r  \x1b[1;92mGenerating\x1b[0m {} ({})", output_file, input_dir);
 
     let mut out = File::create(output_file)?;
 
@@ -79,7 +85,7 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
     let bar = ProgressBar::new(entries.len() as u64);
     bar.set_style(
         ProgressStyle::default_bar()
-            .template("  Building [{bar:25.cyan/blue}] {pos}/{len}: {msg}")
+            .template("\r    \x1b[1;36mBuilding\x1b[0m [{bar:25}] {pos}/{len}: {msg}")
             .unwrap()
             .progress_chars("=> "),
     );
@@ -118,9 +124,11 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
         bar.inc(1);
     }
     bar.finish_with_message("Done!");
+    let duration = start_time.elapsed();
+    println!("\r    \x1b[1;92mFinished\x1b[0m {} files in {:.2?}{}",total,duration," ".repeat(40),);
 
-    println!("Generated: {}", output_file);
-    println!("To compile PDF: typst c {} output.pdf", output_file);
+    println!("   \x1b[1;92mGenerated\x1b[0m {}", output_file);
+    println!("             run `typst c {} output.pdf` for pdf", output_file);
     Ok(())
 }
 
