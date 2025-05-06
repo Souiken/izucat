@@ -17,5 +17,5 @@ target/
 #.idea/
 
 # test output files
-output.pdf
-output.typ
+*.pdf
+*.typ*

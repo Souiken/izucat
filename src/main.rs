@@ -1,4 +1,7 @@
+use ignore::WalkBuilder;
 use indicatif::{ProgressBar, ProgressStyle};
+use clap::{Arg, Command};
+
 use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
@@ -64,9 +67,10 @@ fn to_hex_view(data: &[u8]) -> String {
 /// generate typst
 fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
     let start_time = Instant::now();
-    let mut entries: Vec<_> = ignore::WalkBuilder::new(input_dir)
+    let mut entries: Vec<_> = WalkBuilder::new(input_dir)
+        .standard_filters(true)
         .build()
-        .filter_map(|e| e.ok())
+        .filter_map(Result::ok)
         .filter(|e| e.path().is_file())
         .collect();
 
@@ -74,7 +78,10 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
     entries.sort_by_key(|e| e.file_name().to_os_string());
 
     println!("\r      izucat v{}", env!("CARGO_PKG_VERSION"));
-    println!("\r  \x1b[1;92mGenerating\x1b[0m {} ({})", output_file, input_dir);
+    println!(
+        "\r  \x1b[1;92mGenerating\x1b[0m {} ({})",
+        output_file, input_dir
+    );
 
     let mut out = File::create(output_file)?;
 
@@ -125,44 +132,63 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
     }
     bar.finish_with_message("Done!");
     let duration = start_time.elapsed();
-    println!("\r    \x1b[1;92mFinished\x1b[0m {} files in {:.2?}{}",total,duration," ".repeat(40),);
+    println!(
+        "\r    \x1b[1;92mFinished\x1b[0m {} files in {:.2?}{}",
+        total,
+        duration,
+        " ".repeat(40),
+    );
 
     println!("   \x1b[1;92mGenerated\x1b[0m {}", output_file);
-    println!("             run `typst c {} output.pdf` for pdf", output_file);
+    println!(
+        "             run `typst c {} output.pdf` for pdf",
+        output_file
+    );
     Ok(())
 }
 
 /// program entrance
-fn main() -> std::io::Result<()> {
+fn main() -> std::result::Result<(), ()> {
     let _args = env::args().skip(1);
-    let mut input_path = None;
-    let mut output_file = None;
 
-    // help 
-    let args_vec: Vec<String> = env::args().skip(1).collect();
-    if args_vec.is_empty() || args_vec.iter().any(|a| a == "-h" || a == "--help") {
-        println!("Usage: izucat [OPTIONS] <INPUT_DIR>\nOptions:\n    -o <FILE>        Output Typst file name (default: output.typ)\n    -h, --help       Show this help message
-        ");
-        return Ok(());
+    // help (deprecated)
+    // let args_vec: Vec<String> = env::args().skip(1).collect();
+    // if args_vec.is_empty() || args_vec.iter().any(|a| a == "-h" || a == "--help") {
+    //     println!("Usage: izucat [OPTIONS] <INPUT_DIR>\nOptions:\n    -o <FILE>        Output Typst file name (default: output.typ)\n    -h, --help       Show this help message");
+    //     return Ok(());
+    // }
+
+    let matches = Command::new("YourApp")
+        .about("A description of your app")
+        .arg(
+            Arg::new("output")
+                .short('o')
+                // .long("output")
+                .value_name("FILE")
+                .required(true)
+                .help("Sets the output file name"),
+        )
+        .arg(
+            Arg::new("input")
+                .help("Sets the input path")
+                .required(true)
+                .index(1),
+        )
+        .get_matches();
+
+    let input_path = matches
+        .get_one::<String>("input")
+        .cloned()
+        .unwrap_or_else(|| ".".to_string());
+    let output_file = matches
+        .get_one::<String>("output")
+        .cloned()
+        .unwrap_or_else(|| "output.typ".to_string());
+
+    if let Err(e) = generate_typst(&input_path, &output_file) {
+        eprintln!("Error: {}", e);
+        return Err(());
+    } else {
+        Ok(())
     }
-
-    let mut args = args_vec.into_iter();
-
-    while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "-o" => {
-                output_file = args.next();
-            }
-            _ => {
-                input_path = Some(arg);
-            }
-        }
-    }
-
-    let input_path = input_path.unwrap_or_else(|| ".".to_string());
-    let output_file = output_file.unwrap_or_else(|| "output.typ".to_string());
-
-    generate_typst(&input_path, &output_file)?;
-
-    Ok(())
 }
