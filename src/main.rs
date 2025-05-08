@@ -148,7 +148,7 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
 }
 
 /// program entrance
-fn main() -> std::result::Result<(), ()> {
+fn main() -> Result<(), ()> {
     let _args = env::args().skip(1);
 
     // help (deprecated)
@@ -187,7 +187,7 @@ fn main() -> std::result::Result<(), ()> {
 
     if let Err(e) = generate_typst(&input_path, &output_file) {
         eprintln!("Error: {}", e);
-        return Err(());
+        Err(())
     } else {
         Ok(())
     }
