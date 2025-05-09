@@ -79,7 +79,7 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
 
     println!("\r      izucat v{}", env!("CARGO_PKG_VERSION"));
     println!(
-        "\r  \x1b[1;92mGenerating\x1b[0m {} ({})",
+        "\r  \x1b[1;32mGenerating\x1b[0m {} ({})",
         output_file, input_dir
     );
 
@@ -133,13 +133,13 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
     bar.finish_with_message("Done!");
     let duration = start_time.elapsed();
     println!(
-        "\r    \x1b[1;92mFinished\x1b[0m {} files in {:.2?}{}",
+        "\r    \x1b[1;32mFinished\x1b[0m {} file(s) in {:.2?}{}",
         total,
         duration,
         " ".repeat(40),
     );
 
-    println!("   \x1b[1;92mGenerated\x1b[0m {}", output_file);
+    println!("   \x1b[1;32mGenerated\x1b[0m {}", output_file);
     println!(
         "             run `typst c {} output.pdf` for pdf",
         output_file
