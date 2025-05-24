@@ -32,7 +32,7 @@ fn is_binary(path: &Path) -> bool {
 
 /// escape
 fn escape_typst(text: &str) -> String {
-    text.replace('`', "`\u{200B}")
+    text.to_string()
 }
 
 /// bin to hex
@@ -103,7 +103,7 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
         let rel_path = path.strip_prefix(input_dir).unwrap_or(path);
         let mut display_name = rel_path.display().to_string().replace("\\", "/");
 
-        writeln!(out, "```text")?;
+        writeln!(out, "````text")?;
 
         if is_binary(path) {
             display_name += " (binary)";
@@ -123,7 +123,7 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
             writeln!(out, "{}", escaped)?;
         }
 
-        writeln!(out, "```\n")?;
+        writeln!(out, "````\n")?;
 
         if i < entries.len() - 1 {
             writeln!(out, "#pagebreak()")?;
