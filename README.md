@@ -3,17 +3,22 @@ A program that can recursively concatenate (cat) text and binary files in a path
 
 ## Build
 ```bash
-git clone https://github.com/yourname/izucat.git
+git clone https://github.com/souiken/izucat.git
 cd izucat
 cargo build --release
 ```
 
 ## Usage
 ```
-Usage: izucat [OPTIONS] <INPUT_DIR>
+Usage: izucat -o <FILE> <input>
+
+Arguments:
+  <input>  Sets the input path
+
 Options:
-    -o <FILE>        Output Typst file name (default: output.typ)
-    -h, --help       Show this help message
+  -o <FILE>      Sets the output file name
+  -h, --help     Print help
+
 ```
 
 Example:
@@ -33,7 +38,7 @@ for acts violating the fundamental rights granted him by the constitution or by 
 
 HEX:
 ```text
-path/to/file
+path/to/file  (binary)
 ----------------
 Hex View 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
 00000000 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
