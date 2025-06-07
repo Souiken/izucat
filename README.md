@@ -10,14 +10,15 @@ cargo build --release
 
 ## Usage
 ```
-Usage: izucat -o <FILE> <input>
+Usage: izucat [OPTIONS] -o <FILE> <input>
 
 Arguments:
   <input>  Sets the input path
 
 Options:
-  -o <FILE>      Sets the output file name
-  -h, --help     Print help
+  -o <FILE>              Sets the output file name
+      --no-line-numbers  Sets not show line numbers for text.
+  -h, --help             Print help
 
 ```
 

@@ -65,7 +65,7 @@ fn to_hex_view(data: &[u8]) -> String {
 }
 
 /// generate typst
-fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
+fn generate_typst(input_dir: &str, output_file: &str, line_num: bool) -> io::Result<()> {
     let start_time = Instant::now();
     let mut entries: Vec<_> = WalkBuilder::new(input_dir)
         .standard_filters(true)
@@ -88,6 +88,7 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
     writeln!(out, "#set page(width: 210mm, height: 297mm, margin: 2cm)")?;
     writeln!(out, "#show raw: set text(font: \"Unifont\", size: 8pt)")?;
     writeln!(out, "#show raw: set par(leading: 0.46em)\n")?;
+    writeln!(out, "#let codeblock(code, lineNum) = {{\n  if lineNum {{\n    show raw.line: it => {{\n      box(\n        stack(\n          dir: ltr,\n          box(\n            width: 0em,\n            align(right, \n              text(fill: gray)[\n                #if it.number >= 3 {{ (it.number - 2) }} else {{ \"\" }}\n              ]\n            )\n          ),\n          h(1em),\n          it.body,\n        ),\n      )\n    }}\n    code\n  }}\n  else{{code}}\n}}")?;
 
     let bar = ProgressBar::new(entries.len() as u64);
     bar.set_style(
@@ -103,7 +104,7 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
         let rel_path = path.strip_prefix(input_dir).unwrap_or(path);
         let mut display_name = rel_path.display().to_string().replace("\\", "/");
 
-        writeln!(out, "````text")?;
+        writeln!(out, "#codeblock(````")?;
 
         if is_binary(path) {
             display_name += " (binary)";
@@ -114,6 +115,7 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
 
             writeln!(out, "{}\n----------------", display_name)?;
             writeln!(out, "{}", escaped)?;
+            writeln!(out, "````, false)\n")?;
         } else {
             let mut content = String::new();
             File::open(path)?.read_to_string(&mut content)?;
@@ -121,9 +123,8 @@ fn generate_typst(input_dir: &str, output_file: &str) -> io::Result<()> {
 
             writeln!(out, "{}\n----------------", display_name)?;
             writeln!(out, "{}", escaped)?;
+            if line_num { writeln!(out, "````, true)\n")?; } else { writeln!(out, "````, false)\n")?; }
         }
-
-        writeln!(out, "````\n")?;
 
         if i < entries.len() - 1 {
             writeln!(out, "#pagebreak()")?;
@@ -158,8 +159,8 @@ fn main() -> Result<(), ()> {
     //     return Ok(());
     // }
 
-    let matches = Command::new("YourApp")
-        .about("A description of your app")
+    let matches = Command::new("izucat")
+        .about("A program that can recursively concatenate (cat) text and binary files in a path to typst. ")
         .arg(
             Arg::new("output")
                 .short('o')
@@ -174,6 +175,13 @@ fn main() -> Result<(), ()> {
                 .required(true)
                 .index(1),
         )
+        .arg(
+            Arg::new("noLineNumbers")
+                .long("no-line-numbers")
+                .help("Sets not show line numbers for text.")
+                .required(false)
+                .action(clap::ArgAction::SetTrue)
+        )
         .get_matches();
 
     let input_path = matches
@@ -184,8 +192,9 @@ fn main() -> Result<(), ()> {
         .get_one::<String>("output")
         .cloned()
         .unwrap_or_else(|| "output.typ".to_string());
+    let line_num = matches.get_flag("noLineNumbers");
 
-    if let Err(e) = generate_typst(&input_path, &output_file) {
+    if let Err(e) = generate_typst(&input_path, &output_file, !line_num) {
         eprintln!("Error: {}", e);
         Err(())
     } else {
