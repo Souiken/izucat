@@ -7,3 +7,4 @@ edition = "2021"
 ignore = "0.4"
 indicatif = "0.17"
 clap = { version = "4", features = ["derive"] }
+atty = "0.2.14"
