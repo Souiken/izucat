@@ -96,9 +96,9 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
             content.push('\n');
         }
 
-        writeln!(out, "#codeblock(````\nstdin (piped)\n----------------")?;
+        writeln!(out, "#codeblock(\u{0060}\u{0060}\u{0060}\u{0060}\nstdin (piped)\n----------------")?;
         writeln!(out, "{}", escape_typst(&content))?;
-        writeln!(out, "````, {})\n", if line_num { "true" } else { "false" })?;
+        writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, {})\n", if line_num { "true" } else { "false" })?;
 
         let duration = start_time.elapsed();
         println!(
@@ -121,7 +121,7 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
         let stderr = String::from_utf8_lossy(&output.stderr);
         let escaped = escape_typst(&format!("{}\n{}", stdout, stderr));
 
-        writeln!(out, "#codeblock(````\n$ {}\n----------------\n{}\n````, {})", cmd.join(" "), escaped, line_num)?;
+        writeln!(out, "#codeblock(\u{0060}\u{0060}\u{0060}\u{0060}\n$ {}\n----------------\n{}\n\u{0060}\u{0060}\u{0060}\u{0060}, {})", cmd.join(" "), escaped, line_num)?;
 
         let duration = start_time.elapsed();
         println!(
@@ -140,7 +140,7 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
         let path = Path::new(input_dir);
         if path.is_file() {
             // 单文件处理
-            writeln!(out, "#codeblock(````")?;
+            writeln!(out, "#codeblock(\u{0060}\u{0060}\u{0060}\u{0060}")?;
             let mut display_name = path.file_name().unwrap().to_string_lossy().to_string();
             if is_binary(path) {
                 display_name += " (binary)";
@@ -150,7 +150,7 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
                 let escaped = escape_typst(&hex_view);
                 writeln!(out, "{}\n----------------", display_name)?;
                 writeln!(out, "{}", escaped)?;
-                writeln!(out, "````, false)\n")?;
+                writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, false)\n")?;
             } else {
                 let mut data = Vec::new();
                 File::open(path)?.read_to_end(&mut data)?;
@@ -159,7 +159,7 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
                         let escaped = escape_typst(&content);
                         writeln!(out, "{}\n----------------", display_name)?;
                         writeln!(out, "{}", escaped)?;
-                        writeln!(out, "````, {})\n", if line_num { "true" } else { "false" })?;
+                        writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, {})\n", if line_num { "true" } else { "false" })?;
                     },
                     Err(_) => {
                         display_name += " (non-UTF8)";
@@ -167,7 +167,7 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
                         let escaped = escape_typst(&hex_view);
                         writeln!(out, "{}\n----------------", display_name)?;
                         writeln!(out, "{}", escaped)?;
-                        writeln!(out, "````, false)\n")?;
+                        writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, false)\n")?;
                     }
                 }
             }
@@ -196,7 +196,7 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
                 let rel_path = path.strip_prefix(input_dir).unwrap_or(path);
                 let mut display_name = rel_path.display().to_string().replace("\\", "/");
 
-                writeln!(out, "#codeblock(````")?;
+                writeln!(out, "#codeblock(\u{0060}\u{0060}\u{0060}\u{0060}")?;
 
                 if is_binary(path) {
                     display_name += " (binary)";
@@ -207,7 +207,7 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
 
                     writeln!(out, "{}\n----------------", display_name)?;
                     writeln!(out, "{}", escaped)?;
-                    writeln!(out, "````, false)\n")?;
+                    writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, false)\n")?;
                 } else {
                     let mut data = Vec::new();
                     File::open(path)?.read_to_end(&mut data)?;
@@ -217,7 +217,7 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
                             let escaped = escape_typst(&content);
                             writeln!(out, "{}\n----------------", display_name)?;
                             writeln!(out, "{}", escaped)?;
-                            writeln!(out, "````, {})\n", if line_num { "true" } else { "false" })?;
+                            writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, {})\n", if line_num { "true" } else { "false" })?;
                         },
                         Err(_) => {
                             display_name += " (non-UTF8)";
@@ -225,7 +225,7 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
                             let escaped = escape_typst(&hex_view);
                             writeln!(out, "{}\n----------------", display_name)?;
                             writeln!(out, "{}", escaped)?;
-                            writeln!(out, "````, false)\n")?;
+                            writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, false)\n")?;
                         }
                     }
                 }
