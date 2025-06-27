@@ -137,65 +137,114 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
             "\r  \x1b[1;32mGenerating\x1b[0m {} ({})",
             output_file, input_dir
         );
-        let mut entries: Vec<_> = WalkBuilder::new(input_dir)
-            .standard_filters(true)
-            .build()
-            .filter_map(Result::ok)
-            .filter(|e| e.path().is_file())
-            .collect();
-
-        let total = entries.len();
-        entries.sort_by_key(|e| e.file_name().to_os_string());
-
-        let bar = ProgressBar::new(entries.len() as u64);
-        bar.set_style(
-            ProgressStyle::default_bar()
-                .template("\r    \x1b[1;36mBuilding\x1b[0m [{bar:25}] {pos}/{len}: {msg}")
-                .unwrap()
-                .progress_chars("=> "),
-        );
-
-        for (i, entry) in entries.iter().enumerate() {
-            bar.set_message(entry.path().display().to_string());
-            let path = entry.path();
-            let rel_path = path.strip_prefix(input_dir).unwrap_or(path);
-            let mut display_name = rel_path.display().to_string().replace("\\", "/");
-
+        let path = Path::new(input_dir);
+        if path.is_file() {
+            // 单文件处理
             writeln!(out, "#codeblock(````")?;
-
+            let mut display_name = path.file_name().unwrap().to_string_lossy().to_string();
             if is_binary(path) {
                 display_name += " (binary)";
                 let mut data = Vec::new();
                 File::open(path)?.read_to_end(&mut data)?;
                 let hex_view = to_hex_view(&data);
                 let escaped = escape_typst(&hex_view);
-
                 writeln!(out, "{}\n----------------", display_name)?;
                 writeln!(out, "{}", escaped)?;
                 writeln!(out, "````, false)\n")?;
             } else {
-                let mut content = String::new();
-                File::open(path)?.read_to_string(&mut content)?;
-                let escaped = escape_typst(&content);
+                let mut data = Vec::new();
+                File::open(path)?.read_to_end(&mut data)?;
+                match String::from_utf8(data.clone()) {
+                    Ok(content) => {
+                        let escaped = escape_typst(&content);
+                        writeln!(out, "{}\n----------------", display_name)?;
+                        writeln!(out, "{}", escaped)?;
+                        writeln!(out, "````, {})\n", if line_num { "true" } else { "false" })?;
+                    },
+                    Err(_) => {
+                        display_name += " (non-UTF8)";
+                        let hex_view = to_hex_view(&data);
+                        let escaped = escape_typst(&hex_view);
+                        writeln!(out, "{}\n----------------", display_name)?;
+                        writeln!(out, "{}", escaped)?;
+                        writeln!(out, "````, false)\n")?;
+                    }
+                }
+            }
+        } else {
+            let mut entries: Vec<_> = WalkBuilder::new(input_dir)
+                .standard_filters(true)
+                .build()
+                .filter_map(Result::ok)
+                .filter(|e| e.path().is_file())
+                .collect();
 
-                writeln!(out, "{}\n----------------", display_name)?;
-                writeln!(out, "{}", escaped)?;
-                if line_num { writeln!(out, "````, true)\n")?; } else { writeln!(out, "````, false)\n")?; }
+            let total = entries.len();
+            entries.sort_by_key(|e| e.file_name().to_os_string());
+
+            let bar = ProgressBar::new(entries.len() as u64);
+            bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("\r    \x1b[1;36mBuilding\x1b[0m [{bar:25}] {pos}/{len}: {msg}")
+                    .unwrap()
+                    .progress_chars("=> "),
+            );
+
+            for (i, entry) in entries.iter().enumerate() {
+                bar.set_message(entry.path().display().to_string());
+                let path = entry.path();
+                let rel_path = path.strip_prefix(input_dir).unwrap_or(path);
+                let mut display_name = rel_path.display().to_string().replace("\\", "/");
+
+                writeln!(out, "#codeblock(````")?;
+
+                if is_binary(path) {
+                    display_name += " (binary)";
+                    let mut data = Vec::new();
+                    File::open(path)?.read_to_end(&mut data)?;
+                    let hex_view = to_hex_view(&data);
+                    let escaped = escape_typst(&hex_view);
+
+                    writeln!(out, "{}\n----------------", display_name)?;
+                    writeln!(out, "{}", escaped)?;
+                    writeln!(out, "````, false)\n")?;
+                } else {
+                    let mut data = Vec::new();
+                    File::open(path)?.read_to_end(&mut data)?;
+
+                    match String::from_utf8(data.clone()) {
+                        Ok(content) => {
+                            let escaped = escape_typst(&content);
+                            writeln!(out, "{}\n----------------", display_name)?;
+                            writeln!(out, "{}", escaped)?;
+                            writeln!(out, "````, {})\n", if line_num { "true" } else { "false" })?;
+                        },
+                        Err(_) => {
+                            display_name += " (non-UTF8)";
+                            let hex_view = to_hex_view(&data);
+                            let escaped = escape_typst(&hex_view);
+                            writeln!(out, "{}\n----------------", display_name)?;
+                            writeln!(out, "{}", escaped)?;
+                            writeln!(out, "````, false)\n")?;
+                        }
+                    }
+                }
+
+                if i < entries.len() - 1 {
+                    writeln!(out, "#pagebreak()")?;
+                }
+                bar.inc(1);
             }
 
-            if i < entries.len() - 1 {
-                writeln!(out, "#pagebreak()")?;
-            }
-            bar.inc(1);
+            bar.finish_with_message("Done!");
+            let duration = start_time.elapsed();
+            println!(
+                "\r    \x1b[1;32mFinished\x1b[0m {} file(s) in {:.2?}{}",
+                total,
+                duration,
+                " ".repeat(40),
+            );
         }
-        bar.finish_with_message("Done!");
-        let duration = start_time.elapsed();
-        println!(
-            "\r    \x1b[1;32mFinished\x1b[0m {} file(s) in {:.2?}{}",
-            total,
-            duration,
-            " ".repeat(40),
-        );
     }
 
     println!("   \x1b[1;32mGenerated\x1b[0m {}", output_file);
