@@ -273,8 +273,8 @@ fn main() -> Result<(), ()> {
                 .short('o')
                 // .long("output")
                 .value_name("FILE")
-                .required(true)
-                .help("Sets the output file name"),
+                .required(false)
+                .help("Sets the output file name (default: output.typ)"),
         )
         .arg(
             Arg::new("input")
@@ -297,10 +297,10 @@ fn main() -> Result<(), ()> {
         )
         .after_help(
             "\x1b[4m\x1b[1mExamples:\x1b[0m
-  \x1b[1mizucat -o\x1b[0m output.typ ./src
-  \x1b[1mizucat -o\x1b[0m output.typ \x1b[1m--cmd\x1b[0m \"make\"
-  \x1b[1mizucat -o\x1b[0m output.typ ./src \x1b[1m--cmd\x1b[0m \"make\"
-  \x1b[1mecho\x1b[0m hello | \x1b[1mizucat -o\x1b[0m output.typ",
+  \x1b[1mizucat\x1b[0m ./src
+  \x1b[1mizucat\x1b[0m \x1b[1m--cmd\x1b[0m \"make\"
+  \x1b[1mizucat\x1b[0m ./src \x1b[1m--cmd\x1b[0m \"make\"
+  \x1b[1mecho\x1b[0m hello | \x1b[1mizucat\x1b[0m",
         )
         .get_matches();
 
