@@ -107,7 +107,7 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
             " ".repeat(40),
         );
 
-    }else if let Some(cmd) = cmd_args {
+    } else if let Some(cmd) = cmd_args {
         println!("\r      izucat v{}", env!("CARGO_PKG_VERSION"));
         println!(
             "\r  \x1b[1;32mGenerating\x1b[0m {} `{}`",
@@ -131,7 +131,7 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
             " ".repeat(40),
         );
 
-    }else if let Some(input_dir) = input_dir {
+    } else if let Some(input_dir) = input_dir {
         println!("\r      izucat v{}", env!("CARGO_PKG_VERSION"));
         println!(
             "\r  \x1b[1;32mGenerating\x1b[0m {} ({})",
