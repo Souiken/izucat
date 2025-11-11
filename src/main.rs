@@ -1,40 +1,50 @@
+use clap::{Arg, Command};
 use ignore::WalkBuilder;
 use indicatif::{ProgressBar, ProgressStyle};
-use clap::{Arg, Command};
-
 use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
-use std::time::Instant;
 use std::process::Command as ProcessCommand;
+use std::time::Instant;
 
 
 /// binary?
 fn is_binary(path: &Path) -> bool {
-    if let Ok(mut f) = File::open(path) {
-        let mut buffer = [0; 1024];
-        if let Ok(n) = f.read(&mut buffer) {
-            let chunk = &buffer[..n];
-            if chunk.contains(&0) {
-                return true;
-            }
+    let Ok(mut f) = File::open(path) else { return true };
+    let mut buffer = [0; 1024];
+    let Ok(n) = f.read(&mut buffer) else { return true };
+    let chunk = &buffer[..n];
 
-            let text_characters: Vec<u8> = (0x20..=0xFF).chain([7, 8, 9, 10, 12, 13, 27]).collect();
-            let nontext: Vec<u8> = chunk
-                .iter()
-                .filter(|b| !text_characters.contains(b))
-                .copied()
-                .collect();
-            return !nontext.is_empty();
-        }
-    }
-    true
+    chunk.contains(&0) || chunk.iter().any(|&b| b < 0x20 && ![7, 8, 9, 10, 12, 13, 27].contains(&b))
 }
 
 /// escape
 fn escape_typst(text: &str) -> String {
     text.to_string()
+}
+
+/// Process a single file and write to output
+fn process_file(out: &mut File, path: &Path, display_name: &str, line_num: bool) -> io::Result<()> {
+    writeln!(out, "#codeblock(\u{0060}\u{0060}\u{0060}\u{0060}")?;
+
+    let mut data = Vec::new();
+    File::open(path)?.read_to_end(&mut data)?;
+
+    let (content, show_line_num) = if is_binary(path) {
+        (to_hex_view(&data), false)
+    } else {
+        match String::from_utf8(data.clone()) {
+            Ok(content) => (content, line_num),
+            Err(_) => (to_hex_view(&data), false),
+        }
+    };
+
+    let suffix = if !show_line_num && line_num { " (binary)" } else if !show_line_num { " (non-UTF8)" } else { "" };
+    writeln!(out, "{}{}\n----------------", display_name, suffix)?;
+    writeln!(out, "{}", escape_typst(&content))?;
+    writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, {})\n", show_line_num)?;
+    Ok(())
 }
 
 /// bin to hex
@@ -139,38 +149,8 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
         );
         let path = Path::new(input_dir);
         if path.is_file() {
-            // 单文件处理
-            writeln!(out, "#codeblock(\u{0060}\u{0060}\u{0060}\u{0060}")?;
-            let mut display_name = path.file_name().unwrap().to_string_lossy().to_string();
-            if is_binary(path) {
-                display_name += " (binary)";
-                let mut data = Vec::new();
-                File::open(path)?.read_to_end(&mut data)?;
-                let hex_view = to_hex_view(&data);
-                let escaped = escape_typst(&hex_view);
-                writeln!(out, "{}\n----------------", display_name)?;
-                writeln!(out, "{}", escaped)?;
-                writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, false)\n")?;
-            } else {
-                let mut data = Vec::new();
-                File::open(path)?.read_to_end(&mut data)?;
-                match String::from_utf8(data.clone()) {
-                    Ok(content) => {
-                        let escaped = escape_typst(&content);
-                        writeln!(out, "{}\n----------------", display_name)?;
-                        writeln!(out, "{}", escaped)?;
-                        writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, {})\n", if line_num { "true" } else { "false" })?;
-                    },
-                    Err(_) => {
-                        display_name += " (non-UTF8)";
-                        let hex_view = to_hex_view(&data);
-                        let escaped = escape_typst(&hex_view);
-                        writeln!(out, "{}\n----------------", display_name)?;
-                        writeln!(out, "{}", escaped)?;
-                        writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, false)\n")?;
-                    }
-                }
-            }
+            let display_name = path.file_name().unwrap().to_string_lossy();
+            process_file(&mut out, path, &display_name, line_num)?;
         } else {
             let mut entries: Vec<_> = WalkBuilder::new(input_dir)
                 .standard_filters(true)
@@ -194,41 +174,8 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
                 bar.set_message(entry.path().display().to_string());
                 let path = entry.path();
                 let rel_path = path.strip_prefix(input_dir).unwrap_or(path);
-                let mut display_name = rel_path.display().to_string().replace("\\", "/");
-
-                writeln!(out, "#codeblock(\u{0060}\u{0060}\u{0060}\u{0060}")?;
-
-                if is_binary(path) {
-                    display_name += " (binary)";
-                    let mut data = Vec::new();
-                    File::open(path)?.read_to_end(&mut data)?;
-                    let hex_view = to_hex_view(&data);
-                    let escaped = escape_typst(&hex_view);
-
-                    writeln!(out, "{}\n----------------", display_name)?;
-                    writeln!(out, "{}", escaped)?;
-                    writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, false)\n")?;
-                } else {
-                    let mut data = Vec::new();
-                    File::open(path)?.read_to_end(&mut data)?;
-
-                    match String::from_utf8(data.clone()) {
-                        Ok(content) => {
-                            let escaped = escape_typst(&content);
-                            writeln!(out, "{}\n----------------", display_name)?;
-                            writeln!(out, "{}", escaped)?;
-                            writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, {})\n", if line_num { "true" } else { "false" })?;
-                        },
-                        Err(_) => {
-                            display_name += " (non-UTF8)";
-                            let hex_view = to_hex_view(&data);
-                            let escaped = escape_typst(&hex_view);
-                            writeln!(out, "{}\n----------------", display_name)?;
-                            writeln!(out, "{}", escaped)?;
-                            writeln!(out, "\u{0060}\u{0060}\u{0060}\u{0060}, false)\n")?;
-                        }
-                    }
-                }
+                let display_name = rel_path.display().to_string().replace("\\\\", "/");
+                process_file(&mut out, path, &display_name, line_num)?;
 
                 if i < entries.len() - 1 {
                     writeln!(out, "#pagebreak()")?;
@@ -257,15 +204,6 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
 
 /// program entrance
 fn main() -> Result<(), ()> {
-    let _args = env::args().skip(1);
-
-    // help (deprecated)
-    // let args_vec: Vec<String> = env::args().skip(1).collect();
-    // if args_vec.is_empty() || args_vec.iter().any(|a| a == "-h" || a == "--help") {
-    //     println!("Usage: izucat [OPTIONS] <INPUT_DIR>\nOptions:\n    -o <FILE>        Output Typst file name (default: output.typ)\n    -h, --help       Show this help message");
-    //     return Ok(());
-    // }
-
     let matches = Command::new("izucat")
         .about("A program that can recursively concatenate (cat) text and binary files in a path and/or command/stdin output to typst. ")
         .arg(
@@ -316,7 +254,7 @@ fn main() -> Result<(), ()> {
     let cmd_args = matches
         .get_many::<String>("cmd")
         .map(|vals| vals.cloned().collect::<Vec<_>>());
-    let use_stdin = atty::isnt(atty::Stream::Stdin);
+    let use_stdin = atty::isnt(atty::Stream::Stdin) && input_path == "none" && cmd_args.is_none();
 
     if let Err(e) = generate_typst(Some(&input_path), &output_file, !line_num, cmd_args, use_stdin) {
         eprintln!("\x1b[1;31merror\x1b[0m\x1b[1m:\x1b[0m {}", e);
