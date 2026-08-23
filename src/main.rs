@@ -77,7 +77,7 @@ fn to_hex_view(data: &[u8]) -> String {
 }
 
 /// generate typst
-fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cmd_args: Option<Vec<String>>, use_stdin: bool) -> io::Result<()> {
+fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, line_num_black: bool , cmd_args: Option<Vec<String>>, use_stdin: bool) -> io::Result<()> {
     let start_time = Instant::now();
 
     if cmd_args.is_none() && input_dir == Option::from("none") && !use_stdin {
@@ -86,10 +86,12 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, cm
 
     let mut out = File::create(output_file)?;
 
+    let line_num_colour = if line_num_black { "black" } else { "gray" };
+
     writeln!(out, "#set page(width: 210mm, height: 297mm, margin: 2cm)")?;
     writeln!(out, "#show raw: set text(font: \"Unifont\", size: 8pt)")?;
     writeln!(out, "#show raw: set par(leading: 0.46em)\n")?;
-    writeln!(out, "#let codeblock(code, lineNum) = {{\n  if lineNum {{\n    show raw.line: it => {{\n      box(\n        stack(\n          dir: ltr,\n          box(\n            width: 0em,\n            align(right, \n              text(fill: gray)[\n                #if it.number >= 3 {{ (it.number - 2) }} else {{ \"\" }}\n              ]\n            )\n          ),\n          h(1em),\n          it.body,\n        ),\n      )\n    }}\n    code\n  }}\n  else{{code}}\n}}")?;
+    writeln!(out, "#let codeblock(code, lineNum) = {{\n  if lineNum {{\n    show raw.line: it => {{\n      box(\n        stack(\n          dir: ltr,\n          box(\n            width: 0em,\n            align(right, \n              text(fill: {line_num_colour})[\n                #if it.number >= 3 {{ (it.number - 2) }} else {{ \"\" }}\n              ]\n            )\n          ),\n          h(1em),\n          it.body,\n        ),\n      )\n    }}\n    code\n  }}\n  else{{code}}\n}}")?;
 
     if use_stdin {
         println!("\r      izucat v{}", env!("CARGO_PKG_VERSION"));
@@ -222,8 +224,17 @@ fn main() -> Result<(), ()> {
         )
         .arg(
             Arg::new("noLineNumbers")
+                .short('n')
                 .long("no-line-numbers")
                 .help("Sets not show line numbers for text.")
+                .required(false)
+                .action(clap::ArgAction::SetTrue)
+        )
+        .arg(
+            Arg::new("blackLineNumbers")
+                .short('b')
+                .long("black-line-numbers")
+                .help("Sets line numbers to black for Dot Matrix Printers.")
                 .required(false)
                 .action(clap::ArgAction::SetTrue)
         )
@@ -251,12 +262,13 @@ fn main() -> Result<(), ()> {
         .cloned()
         .unwrap_or_else(|| "output.typ".to_string());
     let line_num = matches.get_flag("noLineNumbers");
+    let line_num_black = matches.get_flag("blackLineNumbers");
     let cmd_args = matches
         .get_many::<String>("cmd")
         .map(|vals| vals.cloned().collect::<Vec<_>>());
     let use_stdin = atty::isnt(atty::Stream::Stdin) && input_path == "none" && cmd_args.is_none();
 
-    if let Err(e) = generate_typst(Some(&input_path), &output_file, !line_num, cmd_args, use_stdin) {
+    if let Err(e) = generate_typst(Some(&input_path), &output_file, !line_num, line_num_black, cmd_args, use_stdin) {
         eprintln!("\x1b[1;31merror\x1b[0m\x1b[1m:\x1b[0m {}", e);
         std::process::exit(1);
     } else {

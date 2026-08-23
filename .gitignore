@@ -20,3 +20,7 @@ target/
 # test output files
 *.pdf
 *.typ*
+
+Cargo.lock
+CLAUDE.md
+LICENSE
