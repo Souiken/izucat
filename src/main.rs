@@ -206,7 +206,7 @@ fn generate_typst(input_dir: Option<&str>, output_file: &str, line_num: bool, li
 
 /// program entrance
 fn main() -> Result<(), ()> {
-    let matches = Command::new("izucat")
+    let mut matches = Command::new("izucat")
         .about("A program that can recursively concatenate (cat) text and binary files in a path and/or command/stdin output to typst. ")
         .arg(
             Arg::new("output")
@@ -223,7 +223,7 @@ fn main() -> Result<(), ()> {
                 .index(1),
         )
         .arg(
-            Arg::new("noLineNumbers")
+            Arg::new("noLincmdeNumbers")
                 .short('n')
                 .long("no-line-numbers")
                 .help("Sets not show line numbers for text.")
@@ -250,8 +250,16 @@ fn main() -> Result<(), ()> {
   \x1b[1mizucat\x1b[0m \x1b[1m--cmd\x1b[0m \"make\"
   \x1b[1mizucat\x1b[0m ./src \x1b[1m--cmd\x1b[0m \"make\"
   \x1b[1mecho\x1b[0m hello | \x1b[1mizucat\x1b[0m",
-        )
-        .get_matches();
+        );
+
+    // If there is nothing, then print help.
+    if std::env::args().len() == 1 {
+        matches.print_help().unwrap();
+        println!();
+        return Ok(());
+    }
+
+    let matches = matches.get_matches();
 
     let input_path = matches
         .get_one::<String>("input")
